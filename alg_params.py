@@ -1,20 +1,34 @@
 
-# dummy parameters
-dom_u = 1
-dom_l = -1
-mu = 0
-sigma = 0.21
-npop = 100
-gens = 30
-mutation = 0.2
-last_best = 0
+# alg parameters
+dom_u = 1 #not used for now 
+dom_l = -1 #not used for now
+mu = 0 #mean for initial population
+sigma = 0.21 #std for initial population
+npop = 70 #size of the population
+n_gens = 100 #number of generations
+mutation_rate = 0.2 #mutation rate
+last_best = 0 #not used for now
+tournament_size = 2 #tournament size
+exit_local_optimum = False #boolean
 
-n_hidden_neurons = 128
+max_time = 1000 #max time for each simulation
 
 #  Other parameters
 seed = 1234
 experiment_name = 'crossover_baseline_enemy1_'+str(seed)
 run_mode = 'train' # train or test
 
+n_hidden_neurons = 128
 
-alg_args = {'experiment_name': experiment_name, 'seed': seed, 'dom_u': dom_u, 'dom_l': dom_l, 'npop': npop, 'gens': gens, 'mutation': mutation, 'last_best': last_best}
+# algorithm parameters
+# mutation_type = 'uniform' # or 'gaussian'
+# crossover_type = 'single_point' # or 'uniform'
+
+# for multiple islands
+n_islands = 6 # number of islands
+# n_migrations = 10 # number of migrations between islands
+migration_size = 2 # number of individuals to migrate between islands 
+migration_interval = 20 # number of generations between migrations
+migration_type = "similarity" # or "diversity"
+
+alg_args = {'dom_u': dom_u, 'dom_l': dom_l, 'npop': npop, 'n_gens': n_gens, 'mutation_rate': mutation_rate, 'last_best': last_best, 'experiment_name': experiment_name, 'tournament_size': tournament_size, 'seed': seed, 'run_mode': run_mode, 'n_hidden_neurons': n_hidden_neurons, 'n_islands': n_islands, 'migration_size': migration_size, 'migration_interval': migration_interval, 'migration_type': migration_type, 'max_time': max_time, 'exit_local_optimum': exit_local_optimum}

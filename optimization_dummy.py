@@ -17,6 +17,7 @@ import numpy as np
 import os
 import time
 import random
+import copy
 
 
 #DIVERSITY OF THE POPULATION AS IMPORTANT AS THE FITNESS OF THE INDIVIDUALS
@@ -33,7 +34,7 @@ if not os.path.exists(experiment_name):
 
 ####   Optimization for controller solution (best genotype-weights for phenotype-network): Ganetic Algorihm    ###
 
-ini = time.time()  # sets time marker
+# ini = time.time()  # sets time marker
 
 
 # runs simulation
@@ -46,13 +47,163 @@ def evaluate(env, x):
     return np.array(list(map(lambda y: simulation(env,y), x)))
 
 
+# def mutation(pop_to_mutate, mut, exit_local_optimum): #this is a dummy mutation function
+#     mutated_pop = []
+
+#     return mutated_pop
+
 def mutation(pop_to_mutate, mut, exit_local_optimum):
     mutated_pop = []
-    
-    return mutated_pop
+    for parent in pop_to_mutate:
+        mut_parent=parent.copy
+        for e in range(len(parent)):
+            if exit_local_optimum:
+                mut_e=mut_parent[e]+np.random.normal(0,10) #10 up for interpertation
+            else:
+                mut_e=mut_parent[e]+np.random.normal(0,1)
+            mut_parent[e]=np.clip(mut_e,dom_l,dom_u) #clip because domain issues
+        mutated_pop.append(mut.parent)
+    return np.array(mutated_pop)
 
+def parent_selection(population, pop_fitness):
+    tournament = np.random.randint(0, len(population), size=(tournament_size,))
+    # if pop_fitness is None:
+    #     fitness = np.array([evaluate_player(EVALUATION_IT, list(population[t])) for t in tournament])
+    # else:
+    np.sort(pop_fitness)
+    fitness = np.array([pop_fitness[t] for t in tournament])
+
+    return np.copy(population[tournament[fitness.argmin()]])
+
+def crossover(parent1, parent2):
+    offspring1, offspring2 = np.copy(parent1),np.copy(parent2)
+    crossover_type= np.random.choice([0,1,2])  #uni, single, double-point
+    if crossover_type== 0:  
+        for i in range(len(parent1)):
+            if np.random.random()<0.5:  
+                offspring1[i], offspring2[i] =parent2[i], parent1[i]
+    elif crossover_type ==1:  #one-point
+        point= np.random.randint(1,len(parent1))  
+        offspring1[:point], offspring2[:point] = parent1[:point],parent2[:point]
+        offspring1[point:], offspring2[point:] = parent2[point:], parent1[point:]
+    elif crossover_type== 2:  #two-point
+        point1 =np.random.randint(1,len(parent1) - 1)
+        point2= np.random.randint(point1,len(parent1))
+        offspring1[point1:point2],offspring2[point1:point2]=parent2[point1:point2],parent1[point1:point2]
+    return offspring1,offspring2
+
+# # kills the worst genomes, and replace with new best/random solutions
+# def doomsday(pop,fit_pop): #this is a dummy doomsday function
+
+#     worst = int(npop/4)  # a quarter of the population
+#     order = np.argsort(fit_pop)
+#     orderasc = order[0:worst]
+
+#     for o in orderasc:
+#         for j in range(0,n_vars):
+#             pro = np.random.uniform(0,1)
+#             if np.random.uniform(0,1)  <= pro:
+#                 pop[o][j] = np.random.uniform(dom_l, dom_u) # random dna, uniform dist.
+#             else:
+#                 pop[o][j] = pop[order[-1:]][0][j] # dna from best
+
+#         fit_pop[o]=evaluate([pop[o]])
+
+#     return pop,fit_pop
+
+
+def similarity(source_island, destination_best, migration_size):
+    source_island_copy = source_island.copy()
+    most_similar = []
+    for i in range(migration_size):
+        similarity = 9999
+        for individual in source_island_copy:
+            difference = [abs(a - b) for a, b in zip(destination_best, individual)]
+            sum_diff = sum(difference)
+            if sum_diff <= similarity:
+                similarity = sum_diff
+                most_similar_ind = individual
+        most_similar.append(most_similar_ind)
+        source_island_copy.remove(most_similar_ind)
+
+    return most_similar
+
+def diversity(source_island, destination_best, migration_size):
+    source_island_copy = source_island.copy()
+    most_diverse = []
+    for i in range(migration_size):
+        diversity = 0
+        for individual in source_island_copy:
+            difference = [abs(a - b) for a, b in zip(destination_best, individual)]
+            sum_diff = sum(difference)
+            if sum_diff >= diversity:
+                diversity = sum_diff
+                most_diverse_ind = individual
+        most_diverse.append(most_diverse_ind)
+        source_island_copy.remove(most_diverse_ind)
+
+    return most_diverse
+
+def migrate(world_population, migration_size, migration_type="similarity"):
+        migrant_groups = []
+
+        for island in world_population:
+            # TODO: create a selection function for the migrants
+            # it is random now
+            # migrant_groups.append({
+            #     # "individuals": island.select(migration_size),
+            #     "individuals": np.random.choice(world_population[island], migration_size),
+            #     "destination": np.random.randint(n_islands)
+            # })
+
+            island_best = np.argmax(island)
+            world_without_destination = world_population.copy()
+            world_without_destination.remove(island)
+            source = np.random.choice(world_without_destination)
+            if migration_type == "similarity":
+                migrants = similarity(source_island=source, destination_best=island_best, migration_size=migration_size)
+                # TODO: add the migrants to the destination island
+                island.extend(migrants)
+                # and delete the worst individual at the destination island
+                for k in range(migration_size):
+                    island.remove(island[np.argmin(island)])
+
+            elif migration_type == "diversity":
+                migrants = diversity(source_island=source, destination_best=island_best, migration_size=migration_size)
+                island.extend(migrants)
+                for k in range(migration_size):
+                    island.remove(island[np.argmin(island)])
+
+
+def individual_island_run(island_population, pop_fit, mutation_rate, exit_local_optimum):
+        # self.sort()
+
+        parent_1, parent_2 = parent_selection(island_population, pop_fitness=pop_fit)
+
+        child_1, child_2 = crossover(parent_1, parent_2)
+
+        child_1_mutated = mutation(child_1, mutation_rate, exit_local_optimum)
+        child_2_mutated = mutation(child_2, mutation_rate, exit_local_optimum)
+
+        # child_1.reevaluate()
+        # child_2.reevaluate()
+
+        island_population.append(child_1_mutated)
+        island_population.append(child_2_mutated)
+
+        return island_population
+
+def parallel_island_run(world_population, pop_fit, mutation_rate, exit_local_optimum):
+    for i in range(n_islands):
+        new_island_population = individual_island_run(population=world_population[i], pop_fit=pop_fit, mutation_rate=mutation_rate, exit_local_optimum=exit_local_optimum)
+
+        world_population[i] = new_island_population
+    
+    return world_population
 
 def main():
+    ini = time.time()  # sets time marker
+
     # choose this for not using visuals and thus making experiments faster
     headless = True
     if headless:
@@ -84,13 +235,20 @@ def main():
         print( '\n NEW EVOLUTION \n')
 
         # initial population using normal distribution centered around 0
-        pop = np.random.normal(mu, sigma, size=(npop, n_weights))
-        pop_fit = evaluate(env, pop) #TODO: evaluate function
-        best = np.argmax(pop_fit)
-        mean = np.mean(pop_fit)
-        std = np.std(pop_fit)
+        # TODO DONE create world population, below is only for one island 
+        # pop = np.random.normal(mu, sigma, size=(npop, n_weights))
+        world_population = [np.random.normal(mu, sigma, size=(npop, n_weights)) for i in range(n_islands)]
+        world_pop_fit = [evaluate(env, one_island_pop_fit) for one_island_pop_fit in world_population] #TODO: evaluate function
+        flattened_world_population = world_population.flatten()
+        flattened_world_pop_fit = world_pop_fit.flatten()
+        # best_islands = [np.argmax(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
+        # best_islands = np.argmax(world_pop_fit, axis=1)
+        best_overall = np.argmax(flattened_world_population)
+        mean = [np.mean(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
+        # std = np.std(pop_fit)
+        std = [np.std(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
         ini_g = 0
-        solutions = [pop, pop_fit]
+        solutions = [[one_island_pop, one_island_pop_fit] for one_island_pop, one_island_pop_fit in zip(world_population, world_pop_fit)]
         env.update_solutions(solutions)
 
     else:
@@ -108,6 +266,65 @@ def main():
         file_aux  = open(experiment_name+'/gen.txt','r')
         ini_g = int(file_aux.readline())
         file_aux.close()
+
+    # saves results for first pop
+    file_aux  = open(experiment_name+'/results.txt','a')
+    file_aux.write('\n\ngen best mean std')
+    print( '\n GENERATION '+str(ini_g)+' '+str(round(flattened_world_pop_fit[best_overall],6))+' '+str(round(mean,6))+' '+str(round(std,6)))
+    file_aux.write('\n'+str(ini_g)+' '+str(round(flattened_world_pop_fit[best_overall],6))+' '+str(round(mean,6))+' '+str(round(std,6))   )
+    file_aux.close()
+
+    # evolution
+    last_sol = flattened_world_pop_fit[best_overall]
+    notimproved = 0
+
+    #TODO: for loop here for the generations
+    for i in range(ini_g+1, n_gens):
+
+        updated_world_population = parallel_island_run(world_population, pop_fit, mutation_rate, exit_local_optimum)
+
+        if i % migration_interval == 0:
+            migrate(updated_world_population, migration_size, n_islands)
+
+
+
+        best = np.argmax(flattened_world_pop_fit)
+        std  =  np.std(flattened_world_pop_fit)
+        mean = np.mean(flattened_world_pop_fit)
+
+
+        # saves results
+        file_aux  = open(experiment_name+'/results.txt','a')
+        print( '\n GENERATION '+str(i)+' '+str(round(flattened_world_pop_fit[best],6))+' '+str(round(mean,6))+' '+str(round(std,6)))
+        file_aux.write('\n'+str(i)+' '+str(round(flattened_world_pop_fit[best],6))+' '+str(round(mean,6))+' '+str(round(std,6))   )
+        file_aux.close()
+
+        # saves generation number
+        file_aux  = open(experiment_name+'/gen.txt','w')
+        file_aux.write(str(i))
+        file_aux.close()
+
+        # saves file with the best solution
+        np.savetxt(experiment_name+'/best.txt',flattened_world_population[best])
+
+        # saves simulation state
+        solutions = [flattened_world_population, flattened_world_pop_fit]
+        env.update_solutions(solutions)
+        env.save_state()
+
+
+    fim = time.time() # prints total execution time for experiment
+    print( '\nExecution time: '+str(round((fim-ini)/60))+' minutes \n')
+    print( '\nExecution time: '+str(round((fim-ini)))+' seconds \n')
+
+
+    file = open(experiment_name+'/neuroended', 'w')  # saves control (simulation has ended) file for bash loop file
+    file.close()
+
+
+    env.state_to_log() # checks environment state
+
+
 
 
 if __name__ == '__main__':
