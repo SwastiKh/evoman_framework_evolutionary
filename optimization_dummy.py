@@ -157,14 +157,16 @@ def diversity(source_island, destination_best, migration_size):
     most_diverse = []
     for i in range(migration_size):
         diversity = 0
-        for individual in source_island_copy:
+        for index in range(len(source_island_copy)):
+            individual = source_island_copy[index]
             difference = [abs(a - b) for a, b in zip(destination_best, individual)]
             sum_diff = sum(difference)
             if sum_diff >= diversity:
                 diversity = sum_diff
                 most_diverse_ind = individual
+                most_diverse_ind_index = index
         most_diverse.append(most_diverse_ind)
-        source_island_copy.remove(most_diverse_ind)
+        source_island_copy = np.delete(source_island_copy, most_diverse_ind_index, axis=0)
 
     return most_diverse
 
@@ -210,10 +212,15 @@ def migrate(world_population, world_pop_fit, migration_size, migration_type):
                 # print("island after append: ", island.shape)
 
             elif migration_type == "diversity":
-                migrants = diversity(source_island=source, destination_best=island_best, migration_size=migration_size)
-                island.extend(migrants)
+                migrants = diversity(source_island=source, destination_best=island[island_best], migration_size=migration_size)
+                world_pop_fit_copy = world_pop_fit.copy()
                 for k in range(migration_size):
-                    island.remove(island[np.argmin(island)])
+                    island_worst = np.argmin(world_pop_fit_copy[i])
+                    island = np.delete(island, island_worst, axis=0)
+                    world_pop_fit_copy = np.delete(world_pop_fit_copy, island_worst)
+
+                island = np.vstack((island, migrants))
+
 
 
 def individual_island_run(island_population, pop_fit, mutation_rate, exit_local_optimum):
@@ -273,7 +280,7 @@ def main():
 
     # initializes simulation in individual evolution mode, for single static enemy.
     env = Environment(experiment_name=experiment_name,
-                    enemies=[1],
+                    enemies=[3],
                     playermode="ai",
                     player_controller=player_controller(n_hidden_neurons), # you  can insert your own controller here
                     enemymode="static",
