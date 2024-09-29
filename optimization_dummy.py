@@ -78,18 +78,18 @@ def mutation(pop_to_mutate, mut, exit_local_optimum):
 
 def parent_selection(population, pop_fitness):
     tournament = np.random.randint(0, len(population), size=(tournament_size))
-    print("tournament in parent selection: ", tournament)
+    # print("tournament in parent selection: ", tournament)
     # if pop_fitness is None:
     #     fitness = np.array([evaluate_player(EVALUATION_IT, list(population[t])) for t in tournament])
     # else:
     np.sort(pop_fitness)
     fitness = np.array([pop_fitness[t] for t in tournament])
-    print("fitness in parent selection: ", fitness)
-    print("fitness len in parent selection: ", len(fitness))
+    # print("fitness in parent selection: ", fitness)
+    # print("fitness len in parent selection: ", len(fitness))
     # parents = np.copy(population[tournament[fitness.argmin()]])
     parents = np.array([population[t] for t in tournament])
-    print("parents in parent selection: ", parents)
-    print("parents len in parent selection: ", len(parents))
+    # print("parents in parent selection: ", parents)
+    # print("parents len in parent selection: ", len(parents))
 
     return parents[0], parents[1]
 
@@ -135,14 +135,19 @@ def similarity(source_island, destination_best, migration_size):
     most_similar = []
     for i in range(migration_size):
         similarity = 9999
-        for individual in source_island_copy:
+        for index in range(len(source_island_copy)):
+            individual = source_island_copy[index]
             difference = [abs(a - b) for a, b in zip(destination_best, individual)]
             sum_diff = sum(difference)
             if sum_diff <= similarity:
                 similarity = sum_diff
                 most_similar_ind = individual
+                most_similar_ind_index = index
         most_similar.append(most_similar_ind)
-        source_island_copy.remove(most_similar_ind)
+        # print("source_island_copy shape before del: ", source_island_copy.shape)
+        # print("most_similar_ind_index: ", most_similar_ind_index)
+        source_island_copy = np.delete(source_island_copy, most_similar_ind_index, axis=0)
+        # print("source_island_copy shape after del: ", source_island_copy.shape)
 
     return most_similar
 
@@ -162,10 +167,10 @@ def diversity(source_island, destination_best, migration_size):
 
     return most_diverse
 
-def migrate(world_population, migration_size, migration_type="similarity"):
+def migrate(world_population, world_pop_fit, migration_size, migration_type):
         migrant_groups = []
 
-        for island in world_population:
+        for i in range(len(world_population)):
             # TODO: create a selection function for the migrants
             # it is random now
             # migrant_groups.append({
@@ -173,18 +178,33 @@ def migrate(world_population, migration_size, migration_type="similarity"):
             #     "individuals": np.random.choice(world_population[island], migration_size),
             #     "destination": np.random.randint(n_islands)
             # })
+            island = world_population[i]
 
-            island_best = np.argmax(island)
+            island_best = np.argmax(world_pop_fit[i])
+            # print("island_best: ", island_best)
+            # print("island[island_best]: ", island[island_best])
             world_without_destination = world_population.copy()
-            world_without_destination.remove(island)
-            source = np.random.choice(world_without_destination)
+            world_without_destination.pop(i)
+            source = random.choice(world_without_destination)
+            # print("source: ", source.shape)
             if migration_type == "similarity":
-                migrants = similarity(source_island=source, destination_best=island_best, migration_size=migration_size)
-                # TODO: add the migrants to the destination island
-                island.extend(migrants)
-                # and delete the worst individual at the destination island
+                migrants = similarity(source_island=source, destination_best=island[island_best], migration_size=migration_size)
+                # remove the worst individuals from the source island
                 for k in range(migration_size):
-                    island.remove(island[np.argmin(island)])
+                    # delete the worst individual at the destination island
+                    # island = np.delete(island, island[np.random.randint(0, len(island))])
+                    island_worst = np.argmin(world_pop_fit[i])
+                    # print("island_worst: ", island_worst)
+                    # print("island before del: ", island.shape)
+                    # island = np.vstack((island[:island_worst],island[island_worst+1:]))
+                    island = np.delete(island, island_worst, axis=0)
+                    # print("island after del: ", island.shape)
+
+                # TODO DONE: add the migrants to the destination island
+                # island = np.concatenate(island, migrants[k], axis=0)
+                island = np.vstack((island, migrants))
+                # island.append(migrants)
+                # print("island after append: ", island.shape)
 
             elif migration_type == "diversity":
                 migrants = diversity(source_island=source, destination_best=island_best, migration_size=migration_size)
@@ -217,7 +237,10 @@ def parallel_island_run(world_population, pop_fit, mutation_rate, exit_local_opt
     for i in range(n_islands):
         new_island_population = individual_island_run(island_population=world_population[i], pop_fit=pop_fit[i], mutation_rate=mutation_rate, exit_local_optimum=exit_local_optimum)
 
+        print("new_island_population: ", new_island_population)
+        print("world_population[i before update]", world_population[i])
         world_population[i] = new_island_population
+        print("world_population[i after update]", world_population[i])
     
     return world_population
 
@@ -308,21 +331,25 @@ def main():
     for i in range(ini_g+1, n_gens):
 
         updated_world_population = parallel_island_run(world_population, world_pop_fit, mutation_rate, exit_local_optimum)
+        updated_world_pop_fit = [evaluate(env, updated_island_pop_fit) for updated_island_pop_fit in updated_world_population]
 
         if i % migration_interval == 0:
-            migrate(updated_world_population, migration_size, migration_type)
+            migrate(updated_world_population, updated_world_pop_fit, migration_size, migration_type)
 
 
-
-        best = np.argmax(flattened_world_pop_fit)
-        std  =  np.std(flattened_world_pop_fit)
-        mean = np.mean(flattened_world_pop_fit)
+        flattened_updated_world_population = np.concatenate([updated_world_population[i] for i in range(n_islands)], axis=0)
+        print("len(flattened_updated_world_population): ", len(flattened_updated_world_population))
+        print("flattened_updated_world_population[0]: ", flattened_updated_world_population[0])
+        flattened_updated_world_pop_fit = evaluate(env, flattened_updated_world_population)
+        best = np.argmax(flattened_updated_world_pop_fit)
+        std  =  np.std(flattened_updated_world_pop_fit)
+        mean = np.mean(flattened_updated_world_pop_fit)
 
 
         # saves results
         file_aux  = open(experiment_name+'/results.txt','a')
-        print( '\n GENERATION '+str(i)+' '+str(round(flattened_world_pop_fit[best],6))+' '+str(round(mean,6))+' '+str(round(std,6)))
-        file_aux.write('\n'+str(i)+' '+str(round(flattened_world_pop_fit[best],6))+' '+str(round(mean,6))+' '+str(round(std,6))   )
+        print( '\n GENERATION '+str(i)+' '+str(round(flattened_updated_world_pop_fit[best],6))+' '+str(round(mean,6))+' '+str(round(std,6)))
+        file_aux.write('\n'+str(i)+' '+str(round(flattened_updated_world_pop_fit[best],6))+' '+str(round(mean,6))+' '+str(round(std,6))   )
         file_aux.close()
 
         # saves generation number
@@ -331,11 +358,11 @@ def main():
         file_aux.close()
 
         # saves file with the best solution
-        print( '\n BEST SOLUTION:'+str(flattened_world_pop_fit[best])+' '+str(flattened_world_population[best])+'\n')
-        np.savetxt(experiment_name+'/best.txt',flattened_world_population[best])
+        print( '\n BEST SOLUTION:'+str(flattened_updated_world_pop_fit[best])+' '+str(flattened_updated_world_population[best])+'\n')
+        np.savetxt(experiment_name+'/best.txt',flattened_updated_world_population[best])
 
         # saves simulation state
-        solutions = [flattened_world_population, flattened_world_pop_fit]
+        solutions = [flattened_updated_world_population, flattened_updated_world_pop_fit]
         env.update_solutions(solutions)
         env.save_state()
 
