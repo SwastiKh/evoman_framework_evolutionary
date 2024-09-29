@@ -53,27 +53,45 @@ def evaluate(env, x):
 #     return mutated_pop
 
 def mutation(pop_to_mutate, mut, exit_local_optimum):
-    mutated_pop = []
-    for parent in pop_to_mutate:
-        mut_parent=parent.copy
-        for e in range(len(parent)):
+    mut_pop=pop_to_mutate.copy()
+    if np.random.random()<mut: # chance of mutation
+        for e in range(len(pop_to_mutate)):
             if exit_local_optimum:
-                mut_e=mut_parent[e]+np.random.normal(0,10) #10 up for interpertation
+                mut_e=mut_pop[e]+np.random.normal(0,5) #5 up for interpertation
             else:
-                mut_e=mut_parent[e]+np.random.normal(0,1)
-            mut_parent[e]=np.clip(mut_e,dom_l,dom_u) #clip because domain issues
-        mutated_pop.append(mut.parent)
-    return np.array(mutated_pop)
+                mut_e=mut_pop[e]+np.random.normal(0,1)
+            mut_pop[e]=np.clip(mut_e,dom_l,dom_u) #clip because domain issues
+        
+    return np.array(mut_pop)
+    
+
+    # mut_pop=pop_to_mutate.copy
+    # for e in range(len(pop)):
+    #     if exit_local_optimum:
+    #         mut_e=mut_pop[e]+np.random.normal(0,5) #5 up for interpertation
+    #     else:
+    #         mut_e=mut_pop[e]+np.random.normal(0,1)
+    #     mut_pop[e]=np.clip(mut_e,dom_l,dom_u) #clip because domain issues
+    # return np.array(mut_pop)
+    # return np.array(mutated_pop)
+
 
 def parent_selection(population, pop_fitness):
-    tournament = np.random.randint(0, len(population), size=(tournament_size,))
+    tournament = np.random.randint(0, len(population), size=(tournament_size))
+    print("tournament in parent selection: ", tournament)
     # if pop_fitness is None:
     #     fitness = np.array([evaluate_player(EVALUATION_IT, list(population[t])) for t in tournament])
     # else:
     np.sort(pop_fitness)
     fitness = np.array([pop_fitness[t] for t in tournament])
+    print("fitness in parent selection: ", fitness)
+    print("fitness len in parent selection: ", len(fitness))
+    # parents = np.copy(population[tournament[fitness.argmin()]])
+    parents = np.array([population[t] for t in tournament])
+    print("parents in parent selection: ", parents)
+    print("parents len in parent selection: ", len(parents))
 
-    return np.copy(population[tournament[fitness.argmin()]])
+    return parents[0], parents[1]
 
 def crossover(parent1, parent2):
     offspring1, offspring2 = np.copy(parent1),np.copy(parent2)
@@ -188,14 +206,16 @@ def individual_island_run(island_population, pop_fit, mutation_rate, exit_local_
         # child_1.reevaluate()
         # child_2.reevaluate()
 
-        island_population.append(child_1_mutated)
-        island_population.append(child_2_mutated)
+        np.delete(island_population, np.argmin(island_population))
+        np.delete(island_population, np.argmin(island_population))
+        np.append(island_population, child_1_mutated)
+        np.append(island_population, child_2_mutated)
 
         return island_population
 
 def parallel_island_run(world_population, pop_fit, mutation_rate, exit_local_optimum):
     for i in range(n_islands):
-        new_island_population = individual_island_run(population=world_population[i], pop_fit=pop_fit, mutation_rate=mutation_rate, exit_local_optimum=exit_local_optimum)
+        new_island_population = individual_island_run(island_population=world_population[i], pop_fit=pop_fit[i], mutation_rate=mutation_rate, exit_local_optimum=exit_local_optimum)
 
         world_population[i] = new_island_population
     
@@ -239,16 +259,22 @@ def main():
         # pop = np.random.normal(mu, sigma, size=(npop, n_weights))
         world_population = [np.random.normal(mu, sigma, size=(npop, n_weights)) for i in range(n_islands)]
         world_pop_fit = [evaluate(env, one_island_pop_fit) for one_island_pop_fit in world_population] #TODO: evaluate function
-        flattened_world_population = world_population.flatten()
-        flattened_world_pop_fit = world_pop_fit.flatten()
+        # flattened_world_population = np.array(world_population).flatten()
+        flattened_world_population = np.concatenate([world_population[i] for i in range(n_islands)], axis=0)
+        # flattened_world_pop_fit = np.array(world_pop_fit).flatten()
+        flattened_world_pop_fit =  np.concatenate([world_pop_fit[i] for i in range(n_islands)], axis=0)
+        print("len(flattened_world_population): ", len(flattened_world_population))
+        print("len(flattened_world_pop_fit): ", len(flattened_world_pop_fit))
         # best_islands = [np.argmax(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
         # best_islands = np.argmax(world_pop_fit, axis=1)
-        best_overall = np.argmax(flattened_world_population)
-        mean = [np.mean(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
+        best_overall = np.argmax(flattened_world_pop_fit)
+        # mean = [np.mean(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
+        mean = np.mean(flattened_world_pop_fit) 
         # std = np.std(pop_fit)
-        std = [np.std(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
+        # std = [np.std(one_island_pop_fit) for one_island_pop_fit in world_pop_fit]
+        std = np.std(flattened_world_pop_fit)
         ini_g = 0
-        solutions = [[one_island_pop, one_island_pop_fit] for one_island_pop, one_island_pop_fit in zip(world_population, world_pop_fit)]
+        solutions = [flattened_world_population, flattened_world_pop_fit]
         env.update_solutions(solutions)
 
     else:
@@ -274,17 +300,17 @@ def main():
     file_aux.write('\n'+str(ini_g)+' '+str(round(flattened_world_pop_fit[best_overall],6))+' '+str(round(mean,6))+' '+str(round(std,6))   )
     file_aux.close()
 
-    # evolution
-    last_sol = flattened_world_pop_fit[best_overall]
-    notimproved = 0
+    # # used for doomsday
+    # last_sol = flattened_world_pop_fit[best_overall]
+    # notimproved = 0
 
     #TODO: for loop here for the generations
     for i in range(ini_g+1, n_gens):
 
-        updated_world_population = parallel_island_run(world_population, pop_fit, mutation_rate, exit_local_optimum)
+        updated_world_population = parallel_island_run(world_population, world_pop_fit, mutation_rate, exit_local_optimum)
 
         if i % migration_interval == 0:
-            migrate(updated_world_population, migration_size, n_islands)
+            migrate(updated_world_population, migration_size, migration_type)
 
 
 
@@ -305,6 +331,7 @@ def main():
         file_aux.close()
 
         # saves file with the best solution
+        print( '\n BEST SOLUTION:'+str(flattened_world_pop_fit[best])+' '+str(flattened_world_population[best])+'\n')
         np.savetxt(experiment_name+'/best.txt',flattened_world_population[best])
 
         # saves simulation state

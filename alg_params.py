@@ -8,7 +8,7 @@ npop = 70 #size of the population
 n_gens = 100 #number of generations
 mutation_rate = 0.2 #mutation rate
 last_best = 0 #not used for now
-tournament_size = 2 #tournament size
+tournament_size = 2 #tournament size for parent selection
 exit_local_optimum = False #boolean
 
 max_time = 1000 #max time for each simulation
@@ -22,7 +22,8 @@ n_hidden_neurons = 128
 
 # algorithm parameters
 # mutation_type = 'uniform' # or 'gaussian'
-# crossover_type = 'single_point' # or 'uniform'
+# TODO: make crossover a choice 
+# crossover_type = 0 # 0 for uniform crossover, 1 for one point crossover, 2 for two point crossover
 
 # for multiple islands
 n_islands = 6 # number of islands
