@@ -14,7 +14,8 @@ exit_local_optimum = False #boolean
 max_time = 1000 #max time for each simulation
 
 #  Other parameters
-seed = np.random.randint(0, 1000)
+# seed = np.random.randint(0, 1000)
+seed = 111
 experiment_name = 'crossover_baseline_enemy1_'+str(seed)
 run_mode = 'train' # train or test
 
@@ -29,7 +30,7 @@ n_hidden_neurons = 128
 n_islands = 6 # number of islands
 # n_migrations = 10 # number of migrations between islands
 migration_size = 2 # number of individuals to migrate between islands 
-migration_interval = 5 # number of generations between migrations
+migration_interval = 20 # number of generations between migrations
 migration_type = "similarity" # or "diversity"
 
 alg_args = {'dom_u': dom_u, 'dom_l': dom_l, 'npop': npop, 'n_gens': n_gens, 'mutation_rate': mutation_rate, 'last_best': last_best, 'experiment_name': experiment_name, 'tournament_size': tournament_size, 'seed': seed, 'run_mode': run_mode, 'n_hidden_neurons': n_hidden_neurons, 'n_islands': n_islands, 'migration_size': migration_size, 'migration_interval': migration_interval, 'migration_type': migration_type, 'max_time': max_time, 'exit_local_optimum': exit_local_optimum}

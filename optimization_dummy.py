@@ -77,8 +77,9 @@ def mutation(pop_to_mutate, mut, exit_local_optimum):
 
 
 def parent_selection(population, pop_fitness):
-    tournament = np.random.randint(0, len(population), size=(tournament_size))
-    # print("tournament in parent selection: ", tournament)
+    tournament = np.random.randint(0, len(population)-1, size=(tournament_size))
+    print("len(population) in parent selection: ", len(population))
+    print("tournament in parent selection: ", tournament)
     # if pop_fitness is None:
     #     fitness = np.array([evaluate_player(EVALUATION_IT, list(population[t])) for t in tournament])
     # else:
@@ -190,15 +191,17 @@ def migrate(world_population, world_pop_fit, migration_size, migration_type):
             if migration_type == "similarity":
                 migrants = similarity(source_island=source, destination_best=island[island_best], migration_size=migration_size)
                 # remove the worst individuals from the source island
+                world_pop_fit_copy = world_pop_fit.copy()
                 for k in range(migration_size):
                     # delete the worst individual at the destination island
                     # island = np.delete(island, island[np.random.randint(0, len(island))])
-                    island_worst = np.argmin(world_pop_fit[i])
+                    island_worst = np.argmin(world_pop_fit_copy[i])
                     # print("island_worst: ", island_worst)
                     # print("island before del: ", island.shape)
                     # island = np.vstack((island[:island_worst],island[island_worst+1:]))
                     island = np.delete(island, island_worst, axis=0)
                     # print("island after del: ", island.shape)
+                    world_pop_fit_copy = np.delete(world_pop_fit_copy, island_worst)
 
                 # TODO DONE: add the migrants to the destination island
                 # island = np.concatenate(island, migrants[k], axis=0)
@@ -215,7 +218,7 @@ def migrate(world_population, world_pop_fit, migration_size, migration_type):
 
 def individual_island_run(island_population, pop_fit, mutation_rate, exit_local_optimum):
         # self.sort()
-
+        print(f"Island Population : {len(island_population)}........")
         parent_1, parent_2 = parent_selection(island_population, pop_fitness=pop_fit)
 
         child_1, child_2 = crossover(parent_1, parent_2)
@@ -225,22 +228,33 @@ def individual_island_run(island_population, pop_fit, mutation_rate, exit_local_
 
         # child_1.reevaluate()
         # child_2.reevaluate()
+        child_1_mutated = child_1_mutated.reshape(1, -1)
+        child_2_mutated = child_2_mutated.reshape(1, -1)
 
-        np.delete(island_population, np.argmin(island_population))
-        np.delete(island_population, np.argmin(island_population))
-        np.append(island_population, child_1_mutated)
-        np.append(island_population, child_2_mutated)
 
-        return island_population
+        delete1 = np.argmin(pop_fit)
+        print("before delete1: ", island_population.shape)
+        updated_island_population = np.delete(island_population, delete1, axis=0)
+        print("after delete1: ", updated_island_population.shape)
+        delete2 = np.argmin(pop_fit)
+        updated_island_population = np.delete(updated_island_population, delete2, axis=0)
+        print("after delete2: ", updated_island_population.shape)
+        updated_island_population = np.append(updated_island_population, child_1_mutated, axis=0)
+        print("after append1: ", updated_island_population.shape)
+        updated_island_population = np.append(updated_island_population, child_2_mutated, axis=0)
+        print("after append2: ", updated_island_population.shape)
+
+        return updated_island_population
 
 def parallel_island_run(world_population, pop_fit, mutation_rate, exit_local_optimum):
     for i in range(n_islands):
+        print(f"Debugging World population of {i} , Island {i+1}: {len(world_population[i])}........")
         new_island_population = individual_island_run(island_population=world_population[i], pop_fit=pop_fit[i], mutation_rate=mutation_rate, exit_local_optimum=exit_local_optimum)
 
-        print("new_island_population: ", new_island_population)
-        print("world_population[i before update]", world_population[i])
+        # print("new_island_population: ", new_island_population)
+        # print("world_population[i before update]", world_population[i])
         world_population[i] = new_island_population
-        print("world_population[i after update]", world_population[i])
+        # print("world_population[i after update]", world_population[i])
     
     return world_population
 
@@ -281,6 +295,8 @@ def main():
         # TODO DONE create world population, below is only for one island 
         # pop = np.random.normal(mu, sigma, size=(npop, n_weights))
         world_population = [np.random.normal(mu, sigma, size=(npop, n_weights)) for i in range(n_islands)]
+        print("len(world_population): ", len(world_population))
+        print("world_population[i] len: ", [len(world_population[i]) for i in range(n_islands)])
         world_pop_fit = [evaluate(env, one_island_pop_fit) for one_island_pop_fit in world_population] #TODO: evaluate function
         # flattened_world_population = np.array(world_population).flatten()
         flattened_world_population = np.concatenate([world_population[i] for i in range(n_islands)], axis=0)
@@ -328,9 +344,13 @@ def main():
     # notimproved = 0
 
     #TODO: for loop here for the generations
-    for i in range(ini_g+1, n_gens):
+    for i in range(ini_g, n_gens):
+        print(f"Generation {i}........")
+        # print("world_population: ", len(world_population[i])) # will have error after n_islands
 
         updated_world_population = parallel_island_run(world_population, world_pop_fit, mutation_rate, exit_local_optimum)
+        print("updated_world_population len: ", len(updated_world_population))
+        print("updated_world_population each island len: ", [len(i) for i in updated_world_population])
         updated_world_pop_fit = [evaluate(env, updated_island_pop_fit) for updated_island_pop_fit in updated_world_population]
 
         if i % migration_interval == 0:
